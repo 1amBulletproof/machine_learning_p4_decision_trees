@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3
 
 #@author		Brandon Tarney
-#@date			8/31/2018
+#@date			10/16/2018
 #@description	ClassificationTree class
 
 import numpy as np
@@ -35,13 +35,17 @@ class TreeNode:
 		# get the majority class of the data @ this node
 		#		- will provide easy way to prune!
 		#			- can "fake" a leaf node
-		classes = [self.data[-1] for row in self.data]
+		classes = [row[-1] for row in self.data]
+		print('classes in node data')
+		print(classes)
 		unique_classes = set(classes)
+		print('unique_classes in node data')
+		print(unique_classes)
 		number_unique_classes = len(unique_classes)
 		#Is this a fake or real leaf node
 		if (number_unique_classes == 1):
 			#True leaf node - only 1 class
-			return self.data[0][-1]
+			return classes[0]
 		else:
 			winning_class = unique_classes[0]
 			winning_class_count = 0
@@ -125,15 +129,13 @@ class ClassificationTree(BaseModel) :
 		print('unique_feature_values')
 		print(unique_feature_values)
 
-		print('RETURNING before the recursion insanity')
-		return
 		#Create sub trees (recursively)
 		for feature_value in unique_feature_values:
 			#TODO: handle numeric vs. category features
 			feature_value_data = [row for row in data if row[best_feature] == feature_value]
 			print('feature_value_data')
 			print(feature_value_data)
-			tree_node.children[feature_value] = build_tree(
+			tree_node.children[feature_value] = self.build_tree(
 					feature_value_data, features_available, recursive_depth)
 
 		return tree_node
@@ -273,6 +275,8 @@ class ClassificationTree(BaseModel) :
 		#Analyze each row separately
 		for row in test_data:
 			node = self.tree
+			print('root node:')
+			print(test_data[0][node.feature_id])
 			while node.isLeaf != True:
 				value = row[node.feature_id]
 				'''
@@ -284,8 +288,8 @@ class ClassificationTree(BaseModel) :
 				else:
 				'''
 				node = node.children[value]
-				if node == NULL: 
-					print('Never seen this val before')
+				if node is None:
+					print('Never seen this val before, breaking')
 					break
 			
 			model_classification = node.get_classification()
@@ -293,6 +297,8 @@ class ClassificationTree(BaseModel) :
 			if (model_classification == data_classification):
 				correct_classifications = correct_classifications + 1
 			total_classifications = total_classifications + 1
+			print('total_classifications')
+			print(total_classifications)
 
 		return float( (correct_classifications / total_classifications) * 100)
 
@@ -335,7 +341,7 @@ def main():
 	classification_tree.train()
 	#validation_data = test_data
 	#validatedTree = test_model.validate() #Should be 0 pruning....
-	percent_accurate = test_model.test(test_data)
+	percent_accurate = classification_tree.test(test_data)
 	print('percent_accurate')
 	print(percent_accurate)
 
