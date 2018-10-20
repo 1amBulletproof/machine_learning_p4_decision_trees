@@ -17,17 +17,19 @@ from base_model3 import BaseModel
 # TreeNode
 #
 # - Class to encapsulate a tree nodek
+#	- data = data at this node in the tree
 #	- feature_id = column idx of data chosen
-#		- Note at a leaf node, data[0] == class val 
 #	- isLeaf = leaf node
+#	- check_pruning = means need to try pruning this 
 #	- #NOTE, children dict keys are "less_than" and "greater_than" for continuous values
 #=============================
 class TreeNode:
-	def __init__(self, data, feature_id, isLeaf, split_value=None):
+	def __init__(self, data, feature_id, isLeaf, split_value=None, check_pruning=False):
 		self.data = data #All of the data @ this node - useful for pruning!
 		self.feature_id = feature_id #feature chosen
 		self.split_value = split_value #Continuous values need to know where the binary split occured
 		self.isLeaf = isLeaf #Leaf nodes are effectively classification nodes
+		self.check_pruning = check_pruning #Whether the node should be considered for pruning
 		#Children populated via build_tree
 		self.children = dict() #NOTE, for continous values "less_than" & "greater_than" will be dict keys
 
@@ -39,6 +41,7 @@ class TreeNode:
 		#print('classes in node data')
 		#print(classes)
 		unique_classes = set(classes)
+		unique_classes = list(unique_classes)
 		#print('unique_classes in node data')
 		#print(unique_classes)
 		number_unique_classes = len(unique_classes)
@@ -119,8 +122,8 @@ class ClassificationTree(BaseModel) :
 			#TODO: continous values
 			split_value = best_feature[1] 
 			best_feature = best_feature[0] 
-			print('best_feature ', best_feature)
-			print('split_value ', split_value)
+			#print('best_feature ', best_feature)
+			#print('split_value ', split_value)
 
 			#Create this node from the winning feature (column index)
 			isLeaf = False
@@ -229,8 +232,8 @@ class ClassificationTree(BaseModel) :
 			#keep track of best split_value
 			for feature_idx in ( range(len(unique_feature_values) - 1) ): #Don't need the last value
 				#get midpoint value & next value
-				print('unique_feature_values')
-				print(unique_feature_values)
+				#print('unique_feature_values')
+				#print(unique_feature_values)
 				split_value = float((float(unique_feature_values[feature_idx]) + float(unique_feature_values[feature_idx+1])) / 2.0)
 				#calculate info_gain_ratio
 				#Information gain / information value
@@ -384,13 +387,125 @@ class ClassificationTree(BaseModel) :
 	#	- validate the data, i.e. prune or optimize for generalization
 	#=============================
 	def validate(self, validation_data):
-		#TODO: pruning here
-		#	- 1. calculate overall performance
-			#- 2. recursively traverse where for each node
-				#- set each child to "isLeaf" thereby triggering majority calculation 
-				#- save performance value
-				#- immediately return once you've got a better performance value than the original tree
-			#- 3. Calculate performance for NEW tree, repeat above
+		#Get original tree performance
+		best_performance = self.test(validation_data)
+		#print('best_performance before validation')
+		#print(best_performance)
+		prior_best_performance = 0
+		while prior_best_performance < best_performance:
+			prior_best_performance = best_performance
+			#Mark every node for pruning
+			self.mark_non_leaves_for_pruning(self.tree)
+			#Prune - fast() -> find a subtree which is better!
+			best_performance  = self.prune_fast(validation_data, self.tree, prior_best_performance)
+
+		return best_performance
+
+	#=============================
+	# mark_non_leaves_for_pruning()
+	#
+	#	- mark all non-leaves for pruning
+	#
+	#@param		test_data to evaluat	
+	#@return	value of performance as percent class error
+	#=============================
+	def mark_non_leaves_for_pruning(self, root_node):
+		if root_node.isLeaf == True:
+			return
+		else:
+			root_node.check_pruning = True
+			for child_key in root_node.children:
+				self.mark_non_leaves_for_pruning(root_node.children[child_key])
+
+	#=============================
+	# prune_fast()
+	#
+	#	- greedy pruning: find first tree modification which outperforms original & return
+	#	- assumes nodes have already been marked for pruning
+	#
+	#@param		test_data to evaluat	
+	#@return	value of performance as percent class error
+	#=============================
+	def prune_fast(self, test_data, root_node, best_prior_performance):
+		#Get the next node fo pruning
+		pruning_node = self.get_next_pruning_node(root_node)
+		#get next node to prune
+		while pruning_node != None:
+			#Stopping point - have pruned all nodes!
+
+			#Set the node as a leaf, thereby effectively "pruning" all its children
+			pruning_node.isLeaf = True
+			feature_id = pruning_node.feature_id
+			pruning_node.feature_id = -1
+
+			#Get this tree's performance
+			best_performance = self.test(test_data)
+
+			#Clear the node from pruning
+			pruning_node.check_pruning = False
+
+			#We found a better overall tree! 
+			if best_performance > best_prior_performance:
+				return best_performance
+
+			#Reset the node/sub-tree
+			pruning_node.isLeaf = False
+			pruning_node.feature_id = feature_id
+			#Get the next node fo pruning
+			pruning_node = self.get_next_pruning_node(root_node)
+
+		#At this point, we would have returned if we had a better performance
+		return best_prior_performance
+
+	#=============================
+	# get_node()
+	#
+	#	- get the given node 
+	#
+	#@param		node_number	number of the node
+	#@return	TreeNode selected (None, if DNE)
+	#=============================
+	def get_node(self, node_number, node, node_id=0):
+		if node_number == node_id:
+			return node
+		elif node.isLeaf == True:
+			return None
+		else:
+			for child_key in node.children:
+				winning_node = self.get_node(node_number, node.children[child_key], node_id+1)
+				if winning_node != None:
+					return winning_node
+			return None
+
+	#=============================
+	# get_next_pruning_node()
+	#
+	#	- get the next available node for pruning
+	#
+	#@param		root_node	root of tree to analyze
+	#@return	next node for pruning or None if DNE
+	#=============================
+	def get_next_pruning_node(self, node):
+		if node.check_pruning == True:
+			return node
+		elif node.isLeaf == True:
+			return None
+		else:
+			for child_key in node.children:
+				pruning_node = self.get_next_pruning_node(node.children[child_key])
+				if pruning_node != None:
+					return pruning_node
+			return None
+
+	#=============================
+	# prune_all()
+	#
+	#	- prune every non leaf (1 at a time) and return map of {prune_nod_id:performance}
+	#
+	#@param		test_data to evaluat	
+	#@return	value of performance as percent class error
+	#=============================
+	def prune_all(self, root_node):
 		return
 
 	#=============================
@@ -409,7 +524,7 @@ class ClassificationTree(BaseModel) :
 		correct_classifications = 0
 		#Analyze each row separately
 		for row in test_data:
-			print('testing row: ', row)
+			#print('testing row: ', row)
 			node = self.tree
 			#print('root node:')
 			#print(test_data[0][node.feature_id])
@@ -434,9 +549,9 @@ class ClassificationTree(BaseModel) :
 					break
 			
 			model_classification = node.get_classification()
-			print('model classification: ', model_classification)
+			#print('model classification: ', model_classification)
 			data_classification = row[-1]
-			print('data classification: ', data_classification)
+			#print('data classification: ', data_classification)
 			if (model_classification == data_classification):
 				correct_classifications = correct_classifications + 1
 			total_classifications = total_classifications + 1
@@ -444,6 +559,39 @@ class ClassificationTree(BaseModel) :
 			#print(total_classifications)
 
 		return float( (correct_classifications / total_classifications) * 100)
+
+	#=============================
+	# print_tree()
+	#
+	#	- print the tree 
+	#
+	#@param		root node
+	#@return	string representation of the tree
+	#=============================
+	def print_tree(self):
+		string = ""
+		string = self.get_tree_as_string(self.tree )
+		return string
+
+	#=============================
+	# get_tree_as_string()
+	#
+	#	- print the tree 
+	#
+	#@param		root node
+	#@return	string representation of the tree
+	#=============================
+	def get_tree_as_string(self, node ):
+		if node.isLeaf == True:
+			string = '{' +  str(node.feature_id) + '}'
+			return string
+		else:
+			string = ' { ' +  str(node.feature_id) + ': '
+			for child_key in node.children:
+				string = string + self.get_tree_as_string(node.children[child_key])
+			string = string + ' } '
+		return string
+
 
 
 #=============================
@@ -453,11 +601,10 @@ def main():
 	print('Main() - testing test model')
 
 	print()
-	print('TEST 1: dummy data')
-	print('NOTE TO SELF: the example from class uses INFORMATION GAIN, NOT GAIN RATIO - possibly different results')
-	print('input data1:')
-	#TODO: turn this into dataframe
-	#test_data = pd.DataFrame([[0, 1, -1], [0, 1, -1],[0, 1, -1]])
+	print('TEST 1: Lecture Example ')
+	print('NOTE: class ex. uses INFO GAIN, NOT GAIN RATIO - possibly diff. results')
+
+	print('Training data:')
 	test_data = [ \
 			['Sunny', 'Hot', 'High', 'False', 'N'],
 			['Sunny', 'Hot', 'High', 'True', 'N'],
@@ -471,9 +618,60 @@ def main():
 			['Rainy', 'Mild', 'Normal', 'False', 'P'],
 			['Sunny', 'Mild', 'Normal', 'True', 'P'],
 			['Overcast', 'Mild', 'High', 'True', 'P'],
-			['Overcast', 'Hot', 'Normal', 'False', 'P'], \
+			['Overcast', 'Hot', 'Normal', 'False', 'P'], 
 			['Rainy', 'Mild', 'High', 'True', 'N'] \
 			]
+	for line in test_data:
+		print(line)
+
+	validation_data = [ \
+			['Sunny', 'Hot', 'High', 'False', 'N'],
+			['Sunny', 'Hot', 'High', 'True', 'N'],
+			['Sunny', 'Mild', 'High', 'False', 'N'],
+			['Sunny', 'Cool', 'Normal', 'False', 'N'],
+			['Sunny', 'Mild', 'Normal', 'True', 'N'],
+			['Rainy', 'Mild', 'Normal', 'False', 'P'],
+			['Rainy', 'Mild', 'High', 'True', 'P'],
+			['Rainy', 'Mild', 'High', 'False', 'P'],
+			['Rainy', 'Cool', 'Normal', 'False', 'P'],
+			['Rainy', 'Cool', 'Normal', 'True', 'P'] \
+			]
+
+	print()
+	print('Validation data (created to trigger pruning):')
+	for line in validation_data:
+		print(line)
+
+	classification_tree = ClassificationTree(test_data)
+	classification_tree.train()
+	tree = classification_tree.print_tree()
+
+	print()
+	print('The Tree (values are columns of data, i.e. features - "-1" is a leaf):')
+	print(tree)
+
+	#percent_accurate = classification_tree.test(test_data)
+	percent_accurate = classification_tree.test(validation_data)
+	print()
+	print('Model Accuracy:', percent_accurate, '%')
+
+	print()
+	print('VALIDATION (prune tree if possible to improve performance)')
+
+	validation_performance = classification_tree.validate(validation_data)
+
+	tree = classification_tree.print_tree()
+	print()
+	print('The Tree (after validation i.e. pruning)')
+	print(tree)
+
+	print()
+	print('Validated Model Accuracy:', validation_performance, '%')
+
+	#TEST2 - CONTINUOUS VALUES
+	print()
+	print('TEST 2: Continuous Data Example')
+	print('Training data:')
 	test_data2 = [ \
 			['Sunny', '3', 'High', '1', 'N'],
 			['Sunny', '3', 'High', '2', 'N'],
@@ -491,22 +689,54 @@ def main():
 			['Rainy', '2', 'High', '2', 'N'] \
 			]
 
-	#for line in test_data:
-		#print(line)
-	#print()
 	for line in test_data2:
 		print(line)
 	print()
 
-	#classification_tree = ClassificationTree(test_data)
-	classification_tree = ClassificationTree(test_data2)
-	classification_tree.train()
-	#validation_data = test_data
-	#validatedTree = test_model.validate() #Should be 0 pruning....
+
+	validation_data2 = [ \
+			['Sunny', '3', 'High', '1', 'N'],
+			['Sunny', '3', 'High', '2', 'N'],
+			['Sunny', '2', 'High', '1', 'N'],
+			['Sunny', '1', 'Normal', '1', 'N'],
+			['Sunny', '2', 'Normal', '2', 'N'],
+			['Rainy', '2', 'Normal', '1', 'P'],
+			['Rainy', '2', 'High', '2', 'P'],
+			['Rainy', '2', 'High', '1', 'P'],
+			['Rainy', '1', 'Normal', '1', 'P'],
+			['Rainy', '1', 'Normal', '2', 'P'] \
+			]
+
+	print()
+	print('Validation data (created to trigger pruning):')
+	for line in validation_data2:
+		print(line)
+
+	classification_tree2 = ClassificationTree(test_data2)
+	classification_tree2.train()
+	tree2 = classification_tree2.print_tree()
+
+	print()
+	print('The Tree (values are columns of data, i.e. features - "-1" is a leaf):')
+	print(tree2)
+
 	#percent_accurate = classification_tree.test(test_data)
-	percent_accurate = classification_tree.test(test_data2)
+	percent_accurate2 = classification_tree2.test(validation_data2)
 	print()
 	print('Model Accuracy:', percent_accurate, '%')
+
+	print()
+	print('VALIDATION (prune tree if possible to improve performance)')
+
+	validation_performance2 = classification_tree2.validate(validation_data2)
+
+	tree2 = classification_tree2.print_tree()
+	print()
+	print('The Tree (after validation i.e. pruning)')
+	print(tree2)
+
+	print()
+	print('Validated Model Accuracy:', validation_performance2, '%')
 
 
 if __name__ == '__main__':
