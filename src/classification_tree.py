@@ -397,7 +397,7 @@ class ClassificationTree(BaseModel) :
 			#Mark every node for pruning
 			self.mark_non_leaves_for_pruning(self.tree)
 			#Prune - fast() -> find a subtree which is better!
-			best_performance  = self.prune_fast(validation_data, self.tree, prior_best_performance)
+			best_performance  = self.prune_tree(validation_data, self.tree, prior_best_performance)
 
 		return best_performance
 
@@ -418,15 +418,15 @@ class ClassificationTree(BaseModel) :
 				self.mark_non_leaves_for_pruning(root_node.children[child_key])
 
 	#=============================
-	# prune_fast()
+	# prune_tree()
 	#
-	#	- greedy pruning: find first tree modification which outperforms original & return
+	#	- find sub trees which outperform the original & make them the actaul tree
 	#	- assumes nodes have already been marked for pruning
 	#
 	#@param		test_data to evaluat	
 	#@return	value of performance as percent class error
 	#=============================
-	def prune_fast(self, test_data, root_node, best_prior_performance):
+	def prune_tree(self, test_data, root_node, best_prior_performance):
 		#Get the next node fo pruning
 		pruning_node = self.get_next_pruning_node(root_node)
 		#get next node to prune
@@ -496,17 +496,6 @@ class ClassificationTree(BaseModel) :
 				if pruning_node != None:
 					return pruning_node
 			return None
-
-	#=============================
-	# prune_all()
-	#
-	#	- prune every non leaf (1 at a time) and return map of {prune_nod_id:performance}
-	#
-	#@param		test_data to evaluat	
-	#@return	value of performance as percent class error
-	#=============================
-	def prune_all(self, root_node):
-		return
 
 	#=============================
 	# test()
@@ -667,6 +656,7 @@ def main():
 
 	print()
 	print('Validated Model Accuracy:', validation_performance, '%')
+	print()
 
 	#TEST2 - CONTINUOUS VALUES
 	print()
@@ -692,7 +682,6 @@ def main():
 	for line in test_data2:
 		print(line)
 	print()
-
 
 	validation_data2 = [ \
 			['Sunny', '3', 'High', '1', 'N'],
