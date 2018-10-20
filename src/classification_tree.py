@@ -69,6 +69,7 @@ class ClassificationTree(BaseModel) :
 
 	LESS_THAN = 'less_than'
 	GREATER_THAN = 'greater_than'
+
 	def __init__(self, data):
 		BaseModel.__init__(self, data)
 
@@ -77,7 +78,9 @@ class ClassificationTree(BaseModel) :
 	#
 	#	- train on the data set
 	#=============================
-	def train(self):
+	def train(self, input_data=None):
+		if input_data != None:
+			self.data = input_data
 		features = list(range(len(self.data[0])-1)) #don't include the class col
 		#print(features)
 		self.tree = self.build_tree(self.data, features, 0)
@@ -108,7 +111,15 @@ class ClassificationTree(BaseModel) :
 		number_unique_classes = len(unique_classes)
 		#print('number_unique_classes')
 		#print(number_unique_classes)
+
+		#STOPPING POINT? - all classes are the same
 		if (number_unique_classes == 1):
+			isLeaf = True
+			leaf_node = TreeNode(data, -1, isLeaf)
+			return leaf_node
+
+		#STOPPING POINT? - no more features to select
+		if (len(features_available) == 0):
 			isLeaf = True
 			leaf_node = TreeNode(data, -1, isLeaf)
 			return leaf_node
@@ -529,6 +540,18 @@ class ClassificationTree(BaseModel) :
 
 				#CATEGORICAL Value
 				else:
+					#Categorical values may NOT exist in a certain partition 
+					#	and therefore not be present as a child. 
+					#	If this is the case, simply end at that node
+					#	- unlinke continuous values 
+					#		(which will always be < or > thus have a node in the tree)
+					node_children = node.children
+					if value not in node_children:
+						print('No child created for this value: "', value, '" likely not seen during training (in a given partition)')
+						print('node children:')
+						print(node_children)
+						break
+
 					prev_node = node
 					node = node.children[value]
 
@@ -561,6 +584,25 @@ class ClassificationTree(BaseModel) :
 		string = ""
 		string = self.get_tree_as_string(self.tree )
 		return string
+
+	#=============================
+	# get_size_of_tree()
+	#
+	#	- count the nodes, including leaves
+	#
+	#@param		root node
+	#@return	string representation of the tree
+	#=============================
+	def get_size_of_tree(self, node=None):
+		if node == None:
+			node = self.tree
+		if node.isLeaf == True:
+			return 1
+		else:
+			size_subtree = 1
+			for child_key in node.children:
+				size_subtree = size_subtree + self.get_size_of_tree(node.children[child_key])
+		return size_subtree
 
 	#=============================
 	# get_tree_as_string()
@@ -634,10 +676,13 @@ def main():
 	classification_tree = ClassificationTree(test_data)
 	classification_tree.train()
 	tree = classification_tree.print_tree()
+	tree_size = classification_tree.get_size_of_tree()
 
 	print()
 	print('The Tree (values are columns of data, i.e. features - "-1" is a leaf):')
 	print(tree)
+	print('Tree size:')
+	print(tree_size)
 
 	#percent_accurate = classification_tree.test(test_data)
 	percent_accurate = classification_tree.test(validation_data)
@@ -650,9 +695,13 @@ def main():
 	validation_performance = classification_tree.validate(validation_data)
 
 	tree = classification_tree.print_tree()
+	tree_size = classification_tree.get_size_of_tree()
+
 	print()
 	print('The Tree (after validation i.e. pruning)')
 	print(tree)
+	print('Tree size:')
+	print(tree_size)
 
 	print()
 	print('Validated Model Accuracy:', validation_performance, '%')
@@ -704,10 +753,13 @@ def main():
 	classification_tree2 = ClassificationTree(test_data2)
 	classification_tree2.train()
 	tree2 = classification_tree2.print_tree()
+	tree_size2 = classification_tree2.get_size_of_tree()
 
 	print()
 	print('The Tree (values are columns of data, i.e. features - "-1" is a leaf):')
 	print(tree2)
+	print('Tree size:')
+	print(tree_size2)
 
 	#percent_accurate = classification_tree.test(test_data)
 	percent_accurate2 = classification_tree2.test(validation_data2)
@@ -720,9 +772,12 @@ def main():
 	validation_performance2 = classification_tree2.validate(validation_data2)
 
 	tree2 = classification_tree2.print_tree()
+	tree_size2 = classification_tree2.get_size_of_tree()
 	print()
 	print('The Tree (after validation i.e. pruning)')
 	print(tree2)
+	print('Tree size:')
+	print(tree_size2)
 
 	print()
 	print('Validated Model Accuracy:', validation_performance2, '%')
