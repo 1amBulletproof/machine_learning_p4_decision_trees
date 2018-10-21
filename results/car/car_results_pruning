@@ -1,0 +1,60 @@
+Namespace(prune='true')
+
+train_data group 0 length:  1236
+tree size: 22
+tree: 
+ { 5:  { 3: {-1} { 0:  { 1: {-1}{-1}{-1}{-1} }  { 4:  { 2: {-1}{-1}{-1}{-1} } {-1}{-1} } {-1}{-1} } {-1} } {-1}{-1} } 
+Accuracy (%): 77.34627831715211
+tree size w/ pruning: 7
+tree: 
+ { 5:  { 3: {-1}{-1}{-1} } {-1}{-1} } 
+Accuracy w/ pruning (%): 76.69902912621359
+
+
+train_data group 1 length:  1236
+tree size: 22
+tree: 
+ { 5:  { 3: {-1} { 0:  { 1: {-1}{-1}{-1}{-1} }  { 2:  { 4: {-1}{-1}{-1} } {-1}{-1}{-1} } {-1}{-1} } {-1} } {-1}{-1} } 
+Accuracy (%): 78.31715210355988
+tree size w/ pruning: 7
+tree: 
+ { 5:  { 3: {-1}{-1}{-1} } {-1}{-1} } 
+Accuracy w/ pruning (%): 79.28802588996764
+
+
+train_data group 2 length:  1236
+tree size: 22
+tree: 
+ { 5:  { 3: {-1} { 0:  { 1: {-1}{-1}{-1}{-1} }  { 4:  { 2: {-1}{-1}{-1}{-1} } {-1}{-1} } {-1}{-1} } {-1} } {-1}{-1} } 
+Accuracy (%): 74.11003236245955
+tree size w/ pruning: 7
+tree: 
+ { 5:  { 3: {-1}{-1}{-1} } {-1}{-1} } 
+Accuracy w/ pruning (%): 73.7864077669903
+
+
+train_data group 3 length:  1236
+tree size: 22
+tree: 
+ { 5:  { 3: {-1} { 0:  { 1: {-1}{-1}{-1}{-1} }  { 4:  { 2: {-1}{-1}{-1}{-1} } {-1}{-1} } {-1}{-1} } {-1} } {-1}{-1} } 
+Accuracy (%): 76.37540453074433
+tree size w/ pruning: 7
+tree: 
+ { 5:  { 3: {-1}{-1}{-1} } {-1}{-1} } 
+Accuracy w/ pruning (%): 75.72815533980582
+
+
+train_data group 4 length:  1236
+tree size: 22
+tree: 
+ { 5:  { 3: {-1} { 0:  { 1: {-1}{-1}{-1}{-1} }  { 2:  { 4: {-1}{-1}{-1} } {-1}{-1}{-1} } {-1}{-1} } {-1} } {-1}{-1} } 
+Accuracy (%): 77.34627831715211
+tree size w/ pruning: 7
+tree: 
+ { 5:  { 3: {-1}{-1}{-1} } {-1}{-1} } 
+Accuracy w/ pruning (%): 76.05177993527508
+
+Average Accuracy (%):
+76.69902912621359 %
+Average pruned Accuracy (%):
+76.31067961165049 %
