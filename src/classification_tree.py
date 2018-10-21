@@ -13,6 +13,18 @@ import math
 import copy
 from base_model3 import BaseModel
 
+
+#=============================
+# is_continuous_value()
+#
+#	- helper fcn - determine if a string is continuous 
+#=============================
+def is_continuous_value(string_value):
+	#isdigit() only works on unsigned integers, so remove decimal & negative
+	stripped_string = string_value.replace('.','',1).replace('-','',1)
+	return stripped_string.isdigit()
+	
+
 #=============================
 # TreeNode
 #
@@ -33,6 +45,11 @@ class TreeNode:
 		#Children populated via build_tree
 		self.children = dict() #NOTE, for continous values "less_than" & "greater_than" will be dict keys
 
+	#=============================
+	# get_classification()
+	#
+	#	- return the classification as majority of class values in this data
+	#=============================
 	def get_classification(self):
 		# get the majority class of the data @ this node
 		#		- will provide easy way to prune!
@@ -129,7 +146,9 @@ class ClassificationTree(BaseModel) :
 		example_best_feature_value = data[0][best_feature[0]]
 
 		#CONTINUOUS FEATURE
-		if (example_best_feature_value.isdigit()): 
+		#TODO: isdigit will NOT work for float values, need something else?!
+		# - one option is replace '.' w/ '' && replace '-' w/ '' then use isdigit
+		if (is_continuous_value(example_best_feature_value)): 
 			#TODO: continous values
 			split_value = best_feature[1] 
 			best_feature = best_feature[0] 
@@ -232,7 +251,8 @@ class ClassificationTree(BaseModel) :
 		best_feature_gain_ratio = 0
 
 		#CONTINUOUS values try all splits and take the best one
-		if (data[0][feature].isdigit() == True):
+		var = '99'
+		if (is_continuous_value(data[0][feature]) == True):
 			#Get values for feature
 			feature_values = [row[feature] for row in data]
 			#Get unique values for testing splits
@@ -408,7 +428,11 @@ class ClassificationTree(BaseModel) :
 			#Mark every node for pruning
 			self.mark_non_leaves_for_pruning(self.tree)
 			#Prune - fast() -> find a subtree which is better!
+			#print('best_performance before pruning')
+			#print(best_performance)
 			best_performance  = self.prune_tree(validation_data, self.tree, prior_best_performance)
+			#print('best_performance after pruning')
+			#print(best_performance)
 
 		return best_performance
 
@@ -532,7 +556,7 @@ class ClassificationTree(BaseModel) :
 				value = row[node.feature_id]
 
 				#CONTINUOUS Value
-				if value.isdigit() == True:
+				if is_continuous_value(value) == True:
 					if float(value) <= node.split_value:
 						node = node.children[ClassificationTree.LESS_THAN]
 					else:
@@ -547,9 +571,9 @@ class ClassificationTree(BaseModel) :
 					#		(which will always be < or > thus have a node in the tree)
 					node_children = node.children
 					if value not in node_children:
-						print('No child created for this value: "', value, '" likely not seen during training (in a given partition)')
-						print('node children:')
-						print(node_children)
+						#print('No child created for this value: "', value, '" likely not seen during training (in a given partition)')
+						#print('node children:')
+						#print(node_children)
 						break
 
 					prev_node = node
